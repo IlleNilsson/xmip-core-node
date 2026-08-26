@@ -2,12 +2,12 @@
 [workspace]
 
 [package]
-name = "xmip-node"
+name = "xmip-core-node"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/IlleNilsson/xmip-node"
+repository = "https://github.com/IlleNilsson/xmip-core-node"
 description = "Xmip Node model and capability declarations."
 
 [dependencies]
-xmip-core = { git = "https://github.com/IlleNilsson/xmip-core", rev = "9adfd1eb4a6a3b5a6b0b6ea9b3a1fb288b41c8fc" }
+xmip-core = { git = "https://github.com/IlleNilsson/xmip-core", branch = "main" }
