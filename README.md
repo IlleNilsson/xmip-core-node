@@ -1,2 +1,2 @@
-# xmip-node
+# xmip-core-node
 Xmip Node model.
