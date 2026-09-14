@@ -1,9 +1,16 @@
 #![forbid(unsafe_code)]
 
 use std::collections::BTreeSet;
+
+use serde::{Deserialize, Serialize};
 use xcore::NodeId;
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+/// What a node is for. The one declaration; the runtime's host plan carried
+/// a copy of these four variants until 2026-09-14 and now uses this one
+/// (ADR-0044: shared code lives where both already depend). Kebab-case is
+/// the form the plan already wrote.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum NodeRole {
     Operational,
     Monitoring,
@@ -11,7 +18,7 @@ pub enum NodeRole {
     Development,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Node {
     pub node_id: NodeId,
     pub name: String,
