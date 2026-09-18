@@ -1,5 +1,9 @@
 #![forbid(unsafe_code)]
 
+pub mod declaration;
+
+pub use declaration::{Declaration, Declared, Purpose};
+
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
