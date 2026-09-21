@@ -182,20 +182,25 @@ mod tests {
     #[test]
     fn a_declaration_stands_while_held_and_is_gone_when_dropped() {
         let directory = scratch("held");
-        let declaration =
-            Declaration::new("xmip-playground-node", "xmip:///C1/node/R1", Purpose::Test);
+        // The name is whatever the operator called the node, and nothing here
+        // reads anything out of it (ADR-0053).
+        let name = "xmip-playground-orders-node-edge-01";
+        let declaration = Declaration::new(name, "xmip:///orders/node/edge-01", Purpose::Test);
 
         let declared = declaration.declare_in(&directory).expect("declared");
         let file = declared.file().to_path_buf();
         let text = fs::read_to_string(&file).expect("the file");
 
         assert!(
-            file.ends_with(format!("xmip-playground-node-{}.toml", process::id())),
+            file.ends_with(format!("{name}-{}.toml", process::id())),
             "{}",
             file.display()
         );
-        assert!(text.contains("name = \"xmip-playground-node\""), "{text}");
-        assert!(text.contains("location = \"xmip:///C1/node/R1\""), "{text}");
+        assert!(text.contains(&format!("name = \"{name}\"")), "{text}");
+        assert!(
+            text.contains("location = \"xmip:///orders/node/edge-01\""),
+            "{text}"
+        );
         assert!(text.contains("purpose = \"test\""), "{text}");
         assert!(text.contains(&format!("pid = {}", process::id())), "{text}");
 
