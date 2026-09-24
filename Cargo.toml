@@ -14,3 +14,5 @@ description = "Xmip Node model and capability declarations."
 # lives with the type rather than on a copy of it in the runtime (ADR-0044).
 serde = { version = "1", features = ["derive"] }
 xcore = { package = "xmip-core", git = "https://github.com/IlleNilsson/xmip-core", branch = "main" }
+# A declaration is TOML; its strings are quoted the one way the estate does.
+codec = { package = "xmip-core-library-codec", git = "https://github.com/IlleNilsson/xmip-core-library-codec", branch = "main" }
