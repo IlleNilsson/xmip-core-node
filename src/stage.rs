@@ -11,6 +11,12 @@
 //! only, so `RECEIVE` or `Send` is an unknown word. An unknown word is
 //! REFUSED, naming the word and the words there are (ADR-0055); it is never
 //! dropped.
+//!
+//! No other language writes the words or the parse again: the runtime's
+//! library forwards [`Stage::WORDS`] and [`Stage::declared`] to the surfaces
+//! as `xmip_stage_words_v1` and `xmip_stage_declared_v1` (`xmip_operate.h`
+//! section 7), and `Xmip.Surface` and the estate's PowerShell module call
+//! those (ADR-0056, amendment 2026-09-24, corrected the same day).
 
 /// A stage of the message path, in path order.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
