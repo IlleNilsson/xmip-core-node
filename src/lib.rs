@@ -1,8 +1,10 @@
 #![forbid(unsafe_code)]
 
+pub mod capability;
 pub mod declaration;
 pub mod stage;
 
+pub use capability::Capability;
 pub use declaration::{Declaration, Declared, Purpose};
 pub use stage::Stage;
 

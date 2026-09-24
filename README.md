@@ -15,7 +15,17 @@ declaration through it, and every other surface calls it: the runtime's
 library forwards `Stage::WORDS` and `Stage::declared` as
 `xmip_stage_words_v1` and `xmip_stage_declared_v1` (`xmip_operate.h`
 section 7), which `Xmip.Surface` and the estate's PowerShell module call
-rather than keep a copy (ADR-0056, amendment 2026-09-24, corrected).
+rather than keep a copy (ADR-0056, amendment 2026-09-24, corrected). A stage
+also says whether an operator may pause it (`pausable`) and what a thing
+configured at it is called (`location`), forwarded the same way.
+
+`Capability` is what a node declares — its stages and whether it may assume
+the internet — and the two forms it is said in: the evidence a node
+publishes about itself (`evidence`, `from_evidence`) and the entry a run
+lists it by (`entry`, `from_entry`: `edge-01=receive+send`). The Playground
+declares through it and the surfaces read through it
+(`xmip_capability_published_v1`, `xmip_capability_entry_v1`). Where a
+declaration places work is not decided here (open problem 25, row o).
 
 A System Process's declaration (ADR-0053) is TOML, its strings quoted by
 `xmip-core-library-codec`: every control character is escaped, so any name,
