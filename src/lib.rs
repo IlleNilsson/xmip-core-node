@@ -1,8 +1,10 @@
 #![forbid(unsafe_code)]
 
 pub mod declaration;
+pub mod stage;
 
 pub use declaration::{Declaration, Declared, Purpose};
+pub use stage::Stage;
 
 use std::collections::BTreeSet;
 
@@ -32,6 +34,7 @@ pub struct Node {
 }
 
 impl Node {
+    #[must_use]
     pub fn supports(&self, capability: &str) -> bool {
         self.capabilities.contains(capability)
     }

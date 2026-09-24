@@ -10,6 +10,7 @@
 //! under the system's temporary directory, the same for every process on the
 //! machine, so that a reader and a writer who were told nothing still meet.
 
+use codec::toml::quote;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{env, fs, io, process};
@@ -109,10 +110,10 @@ impl Declaration {
         format!(
             "name = {}\nlocation = {}\npurpose = {}\npid = {pid}\n\
              started_unix = {started_unix}\npath = {}\n",
-            quoted(&self.name),
-            quoted(&self.location),
-            quoted(self.purpose.word()),
-            quoted(path),
+            quote(&self.name),
+            quote(&self.location),
+            quote(self.purpose.word()),
+            quote(path),
         )
     }
 }
@@ -149,24 +150,6 @@ pub fn directory() -> PathBuf {
             || env::temp_dir().join("xmip").join("process"),
             PathBuf::from,
         )
-}
-
-/// A TOML basic string: a Windows path carries backslashes, which it escapes.
-fn quoted(text: &str) -> String {
-    let mut out = String::with_capacity(text.len() + 2);
-    out.push('"');
-
-    for character in text.chars() {
-        match character {
-            '\\' => out.push_str("\\\\"),
-            '"' => out.push_str("\\\""),
-            '\n' => out.push_str("\\n"),
-            other => out.push(other),
-        }
-    }
-
-    out.push('"');
-    out
 }
 
 #[cfg(test)]
@@ -222,6 +205,19 @@ mod tests {
             "{text}"
         );
         assert!(text.contains("purpose = \"runtime\""), "{text}");
+    }
+
+    #[test]
+    fn every_control_character_is_escaped_as_toml_requires() {
+        let declaration = Declaration::new("xmip-cli", "a\rb\tc\u{0}d\u{7f}", Purpose::Runtime);
+        let text = declaration.to_toml(7, 1_800_000_000, "C:\\x\ny");
+
+        assert!(
+            text.contains(r#"location = "a\rb\tc\u0000d\u007F""#),
+            "{text}"
+        );
+        assert!(text.contains(r#"path = "C:\\x\ny""#), "{text}");
+        assert_eq!(text.lines().count(), 6, "one line per key: {text}");
     }
 
     #[test]
