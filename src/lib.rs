@@ -3,10 +3,12 @@
 pub mod capability;
 pub mod declaration;
 pub mod stage;
+pub mod standing;
 
 pub use capability::Capability;
 pub use declaration::{Declaration, Declared, Purpose};
 pub use stage::Stage;
+pub use standing::{Standing, standing};
 
 use std::collections::BTreeSet;
 

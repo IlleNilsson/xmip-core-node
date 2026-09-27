@@ -28,7 +28,17 @@ declares through it and the surfaces read through it
 
 A System Process's declaration (ADR-0053) is TOML, its strings quoted by
 `xmip-core-library-codec`: every control character is escaped, so any name,
-location or path is one line a TOML reader takes back exactly.
+location or path is one line a TOML reader takes back exactly. `Declaration`
+writes it — the name, the location and the purpose, and whatever else the
+process says of itself (`with`, a bare key and none of the six every
+declaration writes), which is how a Playground node says its flags — and
+`standing` reads back every declaration in a directory (`Standing`). The
+purpose is `test` or `runtime` exactly (`Purpose::declared`); any other word
+is REFUSED, as a stage's is. No other language writes or reads a declaration:
+the runtime's library forwards both as `xmip_process_declare_v1` and
+`xmip_process_declarations_v1` (`xmip_operate.h` section 13), and a declaration
+made across that boundary is `handed_over` to its caller, which takes it away
+where its process ends.
 
 A Node is not the Xmip Service that runs on it and not a Host Service; those
 are `xmip-core-runtime`'s. A Node does not hold cluster membership — the
