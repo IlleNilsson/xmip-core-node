@@ -1,5 +1,6 @@
 //! What a System Process Xmip owns says of itself: its name, its location
-//! and its purpose (ADR-0053 clause 3).
+//! and its purpose (ADR-0053 clause 3), and whatever else it was started
+//! with that a reader would otherwise have to dig out of its command line.
 //!
 //! The name finds a process — every one is `xmip-<what>` — and the
 //! declaration says what it is for. A process writes it where it starts, to
@@ -9,8 +10,16 @@
 //! node's to say, in `XMIP_PROCESS_DIRECTORY`; unset, it is `xmip/process`
 //! under the system's temporary directory, the same for every process on the
 //! machine, so that a reader and a writer who were told nothing still meet.
+//!
+//! No other language writes or reads a declaration again: the runtime's
+//! library forwards [`Declaration::declare`] and [`crate::standing`] to the
+//! surfaces as `xmip_process_declare_v1` and `xmip_process_declarations_v1`
+//! (`xmip_operate.h` section 13), and `Xmip.Surface` and the estate's
+//! PowerShell module call those. Until 2026-09-27 .NET wrote the file again
+//! and PowerShell read it with a TOML reader of its own.
 
 use codec::toml::quote;
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{env, fs, io, process};
@@ -18,6 +27,9 @@ use std::{env, fs, io, process};
 /// The environment variable that names the directory declarations are
 /// written to.
 pub const DIRECTORY_VARIABLE: &str = "XMIP_PROCESS_DIRECTORY";
+
+/// The keys every declaration writes, which nothing else it says may take.
+pub const KEYS: [&str; 6] = ["name", "location", "purpose", "pid", "started_unix", "path"];
 
 /// What a System Process is for.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -29,6 +41,9 @@ pub enum Purpose {
 }
 
 impl Purpose {
+    /// The words a process may declare, exact and lowercase.
+    pub const WORDS: [&'static str; 2] = ["test", "runtime"];
+
     /// The word written in a declaration.
     #[must_use]
     pub const fn word(self) -> &'static str {
@@ -38,19 +53,26 @@ impl Purpose {
         }
     }
 
-    /// The purpose a word names; anything that is not `test` is runtime,
-    /// because a process is runtime unless what started it says otherwise.
-    #[must_use]
-    pub fn named(word: &str) -> Self {
-        if word.trim().eq_ignore_ascii_case("test") {
-            Self::Test
-        } else {
-            Self::Runtime
+    /// The purpose a word declares, exactly and in lowercase, as a stage's
+    /// word is (`Stage::declared`).
+    ///
+    /// # Errors
+    ///
+    /// No purpose is called that: REFUSED, naming the word and the words
+    /// there are (ADR-0055). A word is never taken for runtime by default.
+    pub fn declared(word: &str) -> Result<Self, String> {
+        match word {
+            "test" => Ok(Self::Test),
+            "runtime" => Ok(Self::Runtime),
+            other => Err(format!(
+                "REFUSED: no purpose is called {other:?}; a process declares {}.",
+                Self::WORDS.join(" or ")
+            )),
         }
     }
 }
 
-/// The three things a System Process says of itself.
+/// What a System Process says of itself.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Declaration {
     /// What it is: `xmip-<what>`, the name the operating system schedules.
@@ -60,6 +82,9 @@ pub struct Declaration {
     pub location: String,
     /// Test or runtime.
     pub purpose: Purpose,
+    /// What else it says of itself, key to text, in the order it said it: a
+    /// Playground node its flags, so no reader parses its command line.
+    pub said: Vec<(String, String)>,
 }
 
 impl Declaration {
@@ -69,7 +94,31 @@ impl Declaration {
             name: name.into(),
             location: location.into(),
             purpose,
+            said: Vec::new(),
         }
+    }
+
+    /// The declaration saying one thing more.
+    ///
+    /// # Errors
+    ///
+    /// The key is not a bare TOML key — letters, digits, `_` and `-` — or
+    /// is one of [`KEYS`], which every declaration writes itself.
+    pub fn with(mut self, key: &str, value: impl Into<String>) -> Result<Self, String> {
+        let bare = !key.is_empty()
+            && key
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+
+        if !bare || KEYS.contains(&key) {
+            return Err(format!(
+                "REFUSED: a declaration cannot say {key:?}; a key is a bare word and none of {}.",
+                KEYS.join(", ")
+            ));
+        }
+
+        self.said.push((key.to_string(), value.into()));
+        Ok(self)
     }
 
     /// Declare this process in the directory the node names.
@@ -103,18 +152,25 @@ impl Declaration {
         Ok(Declared { file })
     }
 
-    /// The declaration as the TOML a reader takes: the three things, and
-    /// beside them which process said so, when, and from where on disk.
+    /// The declaration as the TOML a reader takes: the three things, which
+    /// process said so, when, and from where on disk, then what else it said.
     #[must_use]
     pub fn to_toml(&self, pid: u32, started_unix: u64, path: &str) -> String {
-        format!(
+        let mut text = format!(
             "name = {}\nlocation = {}\npurpose = {}\npid = {pid}\n\
              started_unix = {started_unix}\npath = {}\n",
             quote(&self.name),
             quote(&self.location),
             quote(self.purpose.word()),
             quote(path),
-        )
+        );
+
+        for (key, value) in &self.said {
+            // Writing into a String cannot fail.
+            let _ = writeln!(text, "{key} = {}", quote(value));
+        }
+
+        text
     }
 }
 
@@ -130,6 +186,14 @@ impl Declared {
     #[must_use]
     pub fn file(&self) -> &Path {
         &self.file
+    }
+
+    /// Leave the declaration standing and hand its file to a holder across
+    /// the C boundary, which takes it away where its process ends.
+    #[must_use]
+    pub fn handed_over(mut self) -> PathBuf {
+        // What is dropped then names no file, and removing it removes nothing.
+        std::mem::take(&mut self.file)
     }
 }
 
@@ -192,6 +256,19 @@ mod tests {
     }
 
     #[test]
+    fn a_declaration_handed_over_stands_until_its_holder_takes_it_away() {
+        let directory = scratch("handed");
+        let declared = Declaration::new("xmip-cli", "xmip:///", Purpose::Runtime)
+            .declare_in(&directory)
+            .expect("declared");
+
+        let file = declared.handed_over();
+
+        assert!(file.exists(), "a holder across the boundary removes it");
+        fs::remove_file(file).expect("removed by its holder");
+    }
+
+    #[test]
     fn a_windows_path_and_a_quote_survive_as_toml() {
         let declaration = Declaration::new("xmip-cli", "a \"quoted\" place", Purpose::Runtime);
         let text = declaration.to_toml(7, 1_800_000_000, "C:\\Program Files\\Xmip\\xmip-cli.exe");
@@ -221,11 +298,36 @@ mod tests {
     }
 
     #[test]
-    fn a_process_is_runtime_unless_the_word_is_test() {
-        assert_eq!(Purpose::named("test"), Purpose::Test);
-        assert_eq!(Purpose::named(" TEST "), Purpose::Test);
-        assert_eq!(Purpose::named("runtime"), Purpose::Runtime);
-        assert_eq!(Purpose::named(""), Purpose::Runtime);
-        assert_eq!(Purpose::named("production"), Purpose::Runtime);
+    fn what_else_a_process_says_follows_the_six_and_takes_none_of_their_keys() {
+        let declaration = Declaration::new("xmip-playground-node", "xmip:///C1", Purpose::Test)
+            .with("stress", "calm")
+            .and_then(|said| said.with("rounds", "0"))
+            .expect("two bare keys");
+        let text = declaration.to_toml(7, 1, "node");
+
+        assert!(
+            text.ends_with("stress = \"calm\"\nrounds = \"0\"\n"),
+            "{text}"
+        );
+
+        for refused in ["pid", "name", "a b", "", "x=y"] {
+            let said = Declaration::new("xmip-cli", "", Purpose::Runtime).with(refused, "1");
+            assert!(
+                said.is_err_and(|why| why.starts_with("REFUSED")),
+                "{refused}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_purpose_is_one_of_two_exact_words_and_anything_else_is_refused() {
+        assert_eq!(Purpose::declared("test"), Ok(Purpose::Test));
+        assert_eq!(Purpose::declared("runtime"), Ok(Purpose::Runtime));
+
+        for stranger in ["TEST", " test", "", "production"] {
+            let refused = Purpose::declared(stranger).expect_err(stranger);
+            assert!(refused.starts_with("REFUSED"), "{refused}");
+            assert!(refused.contains("test or runtime"), "{refused}");
+        }
     }
 }
