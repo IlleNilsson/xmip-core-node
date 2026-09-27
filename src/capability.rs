@@ -21,8 +21,6 @@
 //! declares no stage. The runtime's library forwards both readings to the
 //! surfaces (`xmip_capability_published_v1`, `xmip_capability_entry_v1`,
 //! `xmip_operate.h` section 7), so `Xmip.Surface` keeps no parse of its own.
-//! Where the declaration is placed is not decided here (open problem 25,
-//! row o).
 
 use crate::Stage;
 
