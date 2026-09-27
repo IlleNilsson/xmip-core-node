@@ -21,8 +21,8 @@
 use codec::toml::quote;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::{env, fs, io, process};
+use xcore::{Clock, SystemClock};
 
 /// The environment variable that names the directory declarations are
 /// written to.
@@ -141,9 +141,8 @@ impl Declaration {
 
         let pid = process::id();
         let file = directory.join(format!("{}-{pid}.toml", self.name));
-        let started = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_or(0, |since| since.as_secs());
+        // The file counts whole seconds; the clock is the estate's one.
+        let started = u64::try_from(SystemClock.unix_seconds()).unwrap_or(0);
         let path = env::current_exe()
             .map(|path| path.display().to_string())
             .unwrap_or_default();
