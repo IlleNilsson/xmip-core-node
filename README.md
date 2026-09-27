@@ -24,8 +24,7 @@ the internet — and the two forms it is said in: the evidence a node
 publishes about itself (`evidence`, `from_evidence`) and the entry a run
 lists it by (`entry`, `from_entry`: `edge-01=receive+send`). The Playground
 declares through it and the surfaces read through it
-(`xmip_capability_published_v1`, `xmip_capability_entry_v1`). Where a
-declaration places work is not decided here (open problem 25, row o).
+(`xmip_capability_published_v1`, `xmip_capability_entry_v1`).
 
 A System Process's declaration (ADR-0053) is TOML, its strings quoted by
 `xmip-core-library-codec`: every control character is escaped, so any name,
