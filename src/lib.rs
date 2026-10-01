@@ -2,11 +2,13 @@
 
 pub mod capability;
 pub mod declaration;
+pub mod role;
 pub mod stage;
 pub mod standing;
 
 pub use capability::Capability;
 pub use declaration::{Declaration, Declared, Purpose};
+pub use role::NodeRole;
 pub use stage::Stage;
 pub use standing::{Standing, standing};
 
@@ -15,19 +17,8 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 use xcore::NodeId;
 
-/// What a node is for. The one declaration; the runtime's host plan carried
-/// a copy of these four variants until 2026-09-14 and now uses this one
-/// (ADR-0044: shared code lives where both already depend). Kebab-case is
-/// the form the plan already wrote.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum NodeRole {
-    Operational,
-    Monitoring,
-    Executing,
-    Development,
-}
-
+/// One machine of a cluster, with the roles it carries for its purpose
+/// ([`NodeRole`]; ADR-0052, ruled 2026-09-19).
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Node {
     pub node_id: NodeId,
@@ -74,6 +65,5 @@ mod tests {
             node.roles.iter().copied().collect::<Vec<_>>(),
             vec![NodeRole::Operational, NodeRole::Executing]
         );
-        assert!(NodeRole::Development > NodeRole::Executing);
     }
 }
