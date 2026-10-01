@@ -130,7 +130,7 @@ impl Capability {
         };
         format!(
             "{DECLARES}{declared}; {}; authentication and runtime capability \
-             are not modelled in this rig",
+             are not declared in this record",
             self.word()
         )
     }
@@ -240,13 +240,13 @@ mod tests {
         assert!(
             Capability::of(&[Stage::Send])
                 .evidence()
-                .contains("not modelled in this rig"),
+                .contains("not declared in this record"),
             "the two kinds left out are said, not silent"
         );
         assert_eq!(
             Capability::none().evidence(),
             "declares no stage of the message path; offline; authentication and runtime \
-             capability are not modelled in this rig"
+             capability are not declared in this record"
         );
         assert_eq!(Capability::from_evidence("alive"), Ok(Capability::none()));
     }
