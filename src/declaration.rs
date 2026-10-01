@@ -53,8 +53,8 @@ impl Purpose {
         }
     }
 
-    /// The purpose a word declares, exactly and in lowercase, as a stage's
-    /// word is (`Stage::declared`).
+    /// The purpose a word declares, exactly and in lowercase, as a role's
+    /// word is (`NodeRole::declared`).
     ///
     /// # Errors
     ///
