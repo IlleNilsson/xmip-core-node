@@ -4,11 +4,12 @@ The Node: one machine in an Xmip Cluster, its `NodeRole`s and what it
 declares. It is the one declaration of what a node is for; anything else that
 needs it reads it here rather than carrying a copy (ADR-0044).
 
-`NodeRole` is that declaration (ADR-0056, amendment 2026-10-01): seven roles —
-operational, monitoring, receiving, processing, sending, executing,
-development. Receiving, processing and sending serve one stage of the message
-path each, and executing is their sum, all three in one process, the
-low-latency role; `NodeRole::stages` says which stages a role serves, and
+`NodeRole` is that declaration (ADR-0056, amendments 2026-10-01): eight
+roles — operational, monitoring, receiving, processing, sending, executing,
+development, storage. Receiving, processing and sending serve one stage of the
+message path each, and executing is their sum, all three in one process, the
+low-latency role; storage is Xmip Storage, the doorway every other node calls
+for all storage, and serves no stage; `NodeRole::stages` says which stages a role serves, and
 `NodeRole::said` says a set of roles one way, the three together as
 executing. `NodeRole::declared` is the one parse: words separated by commas
 or `+`, each exact and lowercase only (the owner, 2026-09-24), an unknown word

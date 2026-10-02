@@ -1,13 +1,17 @@
 //! What a node is for: its roles, the one declaration of them, and the one
 //! parse of a declaration (ADR-0056, amendment 2026-10-01).
 //!
-//! Seven roles. Three serve one stage of the message path each — receiving,
+//! Eight roles. Three serve one stage of the message path each — receiving,
 //! processing, sending — and **executing is their sum**: one node, one
 //! process, the whole Journey without a process hop, which is what buys
 //! latency (the owner, 2026-10-01: *Leave Executing as a sum of Receiving,
 //! Processing and Sending. Executing would be used for Low Latency*;
-//! ADR-0018 clause 10a). The other three serve no stage: operational changes
-//! runtime state, monitoring reads it, development is the Playground's.
+//! ADR-0018 clause 10a). The other four serve no stage: operational changes
+//! runtime state, monitoring reads it, development is the Playground's, and
+//! storage is Xmip Storage, the doorway every other node calls for all
+//! storage (the owner, 2026-10-01: *to have one or more Xmip Nodes with role
+//! Storage would be a safety… Xmip could just do a round robin over Xmip
+//! Nodes roled Storage*; ADR-0056, amendment 2026-10-01, the Storage role).
 //!
 //! The words are exact lowercase only, the owner's rule of 2026-09-24 for the
 //! stage words this declaration replaced: `Receiving` is an unknown word. An
@@ -39,11 +43,15 @@ pub enum NodeRole {
     Executing,
     /// The Playground's: exercises Xmip from outside (ADR-0028).
     Development,
+    /// Xmip Storage: serves every storage operation the other nodes call,
+    /// in front of the runtime and the administration databases
+    /// (`deployment-model.md` sections 3 and 7).
+    Storage,
 }
 
 impl NodeRole {
     /// Every role, in the order a declaration is said in.
-    pub const ALL: [NodeRole; 7] = [
+    pub const ALL: [NodeRole; 8] = [
         NodeRole::Operational,
         NodeRole::Monitoring,
         NodeRole::Receiving,
@@ -51,10 +59,11 @@ impl NodeRole {
         NodeRole::Sending,
         NodeRole::Executing,
         NodeRole::Development,
+        NodeRole::Storage,
     ];
 
     /// The words a node may declare: each role's [`name`](Self::name).
-    pub const WORDS: [&'static str; 7] = [
+    pub const WORDS: [&'static str; 8] = [
         "operational",
         "monitoring",
         "receiving",
@@ -62,6 +71,7 @@ impl NodeRole {
         "sending",
         "executing",
         "development",
+        "storage",
     ];
 
     /// The role's canonical word, as a declaration, a flag and a published
@@ -76,6 +86,7 @@ impl NodeRole {
             Self::Sending => "sending",
             Self::Executing => "executing",
             Self::Development => "development",
+            Self::Storage => "storage",
         }
     }
 
@@ -94,7 +105,7 @@ impl NodeRole {
             Self::Processing => &[Stage::Process],
             Self::Sending => &[Stage::Send],
             Self::Executing => &Stage::ALL,
-            Self::Operational | Self::Monitoring | Self::Development => &[],
+            Self::Operational | Self::Monitoring | Self::Development | Self::Storage => &[],
         }
     }
 
@@ -163,6 +174,8 @@ mod tests {
     fn the_words_are_the_roles_names_in_order() {
         assert_eq!(NodeRole::ALL.map(NodeRole::name), NodeRole::WORDS);
         assert!(NodeRole::Development > NodeRole::Executing);
+        assert!(NodeRole::Storage > NodeRole::Development);
+        assert!(NodeRole::Storage.stages().is_empty());
         for stage in Stage::ALL {
             assert_eq!(NodeRole::serving(stage).stages(), [stage]);
         }
@@ -202,8 +215,8 @@ mod tests {
             NodeRole::declared("Sending + RECEIVING"),
             Err(
                 "REFUSED: no role is called Sending, RECEIVING; a node declares operational, \
-                 monitoring, receiving, processing, sending, executing, development, or \
-                 nothing at all."
+                 monitoring, receiving, processing, sending, executing, development, \
+                 storage, or nothing at all."
                     .to_string()
             )
         );
