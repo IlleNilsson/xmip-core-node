@@ -163,7 +163,7 @@ mod tests {
         .expect("an unknown purpose");
         fs::write(directory.join("other-4.toml"), "").expect("not xmip-*");
 
-        assert!(standing(&directory).is_empty());
-        assert!(standing(&directory.join("nowhere")).is_empty());
+        assert_eq!(standing(&directory), [] as [Standing; 0]);
+        assert_eq!(standing(&directory.join("nowhere")), [] as [Standing; 0]);
     }
 }

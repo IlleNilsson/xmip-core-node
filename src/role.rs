@@ -175,7 +175,7 @@ mod tests {
         assert_eq!(NodeRole::ALL.map(NodeRole::name), NodeRole::WORDS);
         assert!(NodeRole::Development > NodeRole::Executing);
         assert!(NodeRole::Storage > NodeRole::Development);
-        assert!(NodeRole::Storage.stages().is_empty());
+        assert_eq!(NodeRole::Storage.stages(), []);
         for stage in Stage::ALL {
             assert_eq!(NodeRole::serving(stage).stages(), [stage]);
         }
@@ -196,7 +196,7 @@ mod tests {
             NodeRole::declared("processing+sending"),
             Ok(vec![NodeRole::Processing, NodeRole::Sending])
         );
-        assert!(NodeRole::Operational.stages().is_empty());
+        assert_eq!(NodeRole::Operational.stages(), []);
     }
 
     #[test]
