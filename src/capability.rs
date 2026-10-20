@@ -14,7 +14,7 @@
 //!   - **Online capability** — whether a route off this machine may be
 //!     assumed (ADR-0045).
 //!
-//! Authentication and runtime capability are not modelled, and the evidence a
+//! Authentication and runtime capability are not modeled, and the evidence a
 //! node publishes says so rather than staying silent.
 //!
 //! A declaration is said in two forms, each written and read here and
