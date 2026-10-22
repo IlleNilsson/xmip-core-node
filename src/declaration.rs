@@ -2,7 +2,7 @@
 //! and its purpose (ADR-0053 clause 3), and whatever else it was started
 //! with that a reader would otherwise have to dig out of its command line.
 //!
-//! The name finds a process — every one is `xmip-<what>` — and the
+//! The name finds a process — every one is `xmip` or `xmip-<what>` — and the
 //! declaration says what it is for. A process writes it where it starts, to
 //! one file named for it and its pid, and takes it away where it ends; a
 //! process that is killed leaves its file behind, and whoever lists the
@@ -75,7 +75,8 @@ impl Purpose {
 /// What a System Process says of itself.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Declaration {
-    /// What it is: `xmip-<what>`, the name the operating system schedules.
+    /// What it is: `xmip` or `xmip-<what>`, the name the operating system
+    /// schedules.
     pub name: String,
     /// Where in Xmip it belongs: the scope it serves, or the surface it
     /// reads where it serves none.
@@ -263,7 +264,7 @@ mod tests {
     #[test]
     fn a_declaration_handed_over_stands_until_its_holder_takes_it_away() {
         let directory = scratch("handed");
-        let declared = Declaration::new("xmip-cli", "xmip:///", Purpose::Runtime)
+        let declared = Declaration::new("xmip", "xmip:///", Purpose::Runtime)
             .declare_in(&directory)
             .expect("declared");
 
@@ -275,15 +276,15 @@ mod tests {
 
     #[test]
     fn a_windows_path_and_a_quote_survive_as_toml() {
-        let declaration = Declaration::new("xmip-cli", "a \"quoted\" place", Purpose::Runtime);
-        let text = declaration.to_toml(7, 1_800_000_000, "C:\\Program Files\\Xmip\\xmip-cli.exe");
+        let declaration = Declaration::new("xmip", "a \"quoted\" place", Purpose::Runtime);
+        let text = declaration.to_toml(7, 1_800_000_000, "C:\\Program Files\\Xmip\\xmip.exe");
 
         assert!(
             text.contains("location = \"a \\\"quoted\\\" place\""),
             "{text}"
         );
         assert!(
-            text.contains("path = \"C:\\\\Program Files\\\\Xmip\\\\xmip-cli.exe\""),
+            text.contains("path = \"C:\\\\Program Files\\\\Xmip\\\\xmip.exe\""),
             "{text}"
         );
         assert!(text.contains("purpose = \"runtime\""), "{text}");
@@ -291,7 +292,7 @@ mod tests {
 
     #[test]
     fn every_control_character_is_escaped_as_toml_requires() {
-        let declaration = Declaration::new("xmip-cli", "a\rb\tc\u{0}d\u{7f}", Purpose::Runtime);
+        let declaration = Declaration::new("xmip", "a\rb\tc\u{0}d\u{7f}", Purpose::Runtime);
         let text = declaration.to_toml(7, 1_800_000_000, "C:\\x\ny");
 
         assert!(
@@ -317,7 +318,7 @@ mod tests {
         );
 
         for refused in ["pid", "name", "a b", "", "x=y"] {
-            let said = Declaration::new("xmip-cli", "", Purpose::Runtime).with(refused, "1");
+            let said = Declaration::new("xmip", "", Purpose::Runtime).with(refused, "1");
             assert!(
                 said.is_err_and(|why| why.starts_with("REFUSED")),
                 "{refused}"
