@@ -5,6 +5,7 @@ pub mod declaration;
 pub mod role;
 pub mod stage;
 pub mod standing;
+pub mod unit;
 
 pub use capability::Capability;
 pub use declaration::{Declaration, Declared, Purpose};
