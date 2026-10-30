@@ -3,7 +3,7 @@
 //!
 //! Eight roles. Three serve one stage of the message path each — receiving,
 //! processing, sending — and **executing is their sum**: one node, one
-//! process, the whole Journey without a process hop, which is what buys
+//! process, a Message's whole Journey without a process hop, which is what buys
 //! latency (the owner, 2026-10-01: *Leave Executing as a sum of Receiving,
 //! Processing and Sending. Executing would be used for Low Latency*;
 //! ADR-0018 clause 10a). The other four serve no stage: operational changes
@@ -39,7 +39,7 @@ pub enum NodeRole {
     /// Serves the send stage: a Send Port starts here.
     Sending,
     /// Receiving, processing and sending in one process: the low-latency
-    /// role, a Journey with no process hop.
+    /// role, a Message with no process hop.
     Executing,
     /// The Playground's: exercises Xmip from outside (ADR-0028).
     Development,
