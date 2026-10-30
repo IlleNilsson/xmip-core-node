@@ -115,7 +115,7 @@ impl Capability {
         self.roles.iter().any(|role| role.stages().contains(&stage))
     }
 
-    /// Whether the node carries the whole Journey in its one process: the
+    /// Whether the node carries a Message its whole Journey in one process: the
     /// executing role (ADR-0018 clause 10a).
     #[must_use]
     pub fn executes(&self) -> bool {
