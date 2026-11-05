@@ -7,7 +7,7 @@
 //! latency (the owner, 2026-10-01: *Leave Executing as a sum of Receiving,
 //! Processing and Sending. Executing would be used for Low Latency*;
 //! ADR-0018 clause 10a). The other four serve no stage: operational changes
-//! runtime state, monitoring reads it, development is the Playground's, and
+//! runtime state, monitoring reads it, development is the Essentials', and
 //! storage is Xmip Storage, the doorway every other node calls for all
 //! storage (the owner, 2026-10-01: *to have one or more Xmip Nodes with role
 //! Storage would be a safety… Xmip could just do a round robin over Xmip
@@ -41,7 +41,7 @@ pub enum NodeRole {
     /// Receiving, processing and sending in one process: the low-latency
     /// role, a Message with no process hop.
     Executing,
-    /// The Playground's: exercises Xmip from outside (ADR-0028).
+    /// The Essentials': exercises Xmip from outside (ADR-0028).
     Development,
     /// Xmip Storage: serves every storage operation the other nodes call,
     /// in front of the runtime and the administration databases

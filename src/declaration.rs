@@ -34,7 +34,7 @@ pub const KEYS: [&str; 6] = ["name", "location", "purpose", "pid", "started_unix
 /// What a System Process is for.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Purpose {
-    /// The Playground and everything it spawns, and whatever a test started.
+    /// The Essentials and everything it spawns, and whatever a test started.
     Test,
     /// Everything else: the product doing its work.
     Runtime,
@@ -84,7 +84,7 @@ pub struct Declaration {
     /// Test or runtime.
     pub purpose: Purpose,
     /// What else it says of itself, key to text, in the order it said it: a
-    /// Playground node its flags, so no reader parses its command line.
+    /// Essentials node its flags, so no reader parses its command line.
     pub said: Vec<(String, String)>,
 }
 
@@ -141,7 +141,7 @@ impl Declaration {
         fs::create_dir_all(directory)?;
 
         let pid = process::id();
-        let file = directory.join(format!("{}-{pid}.toml", self.name));
+        let file = directory.join(format!("{}-{pid}.xmip", self.name));
         // The file counts whole seconds; the clock is the estate's one.
         let started = u64::try_from(SystemClock.unix_seconds()).unwrap_or(0);
         let path = env::current_exe()
@@ -233,7 +233,7 @@ mod tests {
         // reads anything out of it (ADR-0053).
         let cluster = configure::fixture::test_cluster();
         let name = format!(
-            "xmip-playground-{}-node-{}",
+            "xmip-essentials-{}-node-{}",
             cluster.name,
             cluster.node(0).name
         );
@@ -245,7 +245,7 @@ mod tests {
         let text = fs::read_to_string(&file).expect("the file");
 
         assert!(
-            file.ends_with(format!("{name}-{}.toml", process::id())),
+            file.ends_with(format!("{name}-{}.xmip", process::id())),
             "{}",
             file.display()
         );
@@ -306,7 +306,7 @@ mod tests {
     #[test]
     fn what_else_a_process_says_follows_the_six_and_takes_none_of_their_keys() {
         let scope = configure::fixture::test_cluster().scope();
-        let declaration = Declaration::new("xmip-playground-node", &scope, Purpose::Test)
+        let declaration = Declaration::new("xmip-essentials-node", &scope, Purpose::Test)
             .with("stress", "calm")
             .and_then(|said| said.with("rounds", "0"))
             .expect("two bare keys");
