@@ -88,15 +88,48 @@ pub struct Declaration {
     pub said: Vec<(String, String)>,
 }
 
+/// Why `name` is no System Process's name, if it is not: `xmip`, or `xmip-`
+/// and letters, digits and hyphens (ADR-0053 clauses 1 and 4; the cluster
+/// and the node in an Essentials name keep their case). The name becomes
+/// the declaration's file name, so nothing else ever reaches the path.
+fn refusal(name: &str) -> Option<String> {
+    let shaped = name == "xmip"
+        || name.strip_prefix("xmip-").is_some_and(|what| {
+            !what.is_empty()
+                && what
+                    .chars()
+                    .all(|letter| letter.is_ascii_alphanumeric() || letter == '-')
+        });
+    (!shaped).then(|| {
+        format!(
+            "REFUSED: a System Process is named xmip or xmip-<what>, letters, digits and \
+             hyphens: not {name:?}"
+        )
+    })
+}
+
 impl Declaration {
-    #[must_use]
-    pub fn new(name: impl Into<String>, location: impl Into<String>, purpose: Purpose) -> Self {
-        Self {
-            name: name.into(),
+    /// The declaration of the process `name`, at `location`, for `purpose`.
+    ///
+    /// # Errors
+    ///
+    /// `name` is not `xmip` or `xmip-<what>`, letters, digits and hyphens:
+    /// REFUSED, in words, since the name is the declaration's file name.
+    pub fn new(
+        name: impl Into<String>,
+        location: impl Into<String>,
+        purpose: Purpose,
+    ) -> Result<Self, String> {
+        let name = name.into();
+        if let Some(refused) = refusal(&name) {
+            return Err(refused);
+        }
+        Ok(Self {
+            name,
             location: location.into(),
             purpose,
             said: Vec::new(),
-        }
+        })
     }
 
     /// The declaration saying one thing more.
@@ -238,7 +271,7 @@ mod tests {
             cluster.node(0).name
         );
         let location = cluster.node_scope(0);
-        let declaration = Declaration::new(&name, &location, Purpose::Test);
+        let declaration = Declaration::new(&name, &location, Purpose::Test).expect("a name");
 
         let declared = declaration.declare_in(&directory).expect("declared");
         let file = declared.file().to_path_buf();
@@ -265,6 +298,7 @@ mod tests {
     fn a_declaration_handed_over_stands_until_its_holder_takes_it_away() {
         let directory = scratch("handed");
         let declared = Declaration::new("xmip", "xmip:///", Purpose::Runtime)
+            .expect("a name")
             .declare_in(&directory)
             .expect("declared");
 
@@ -276,7 +310,8 @@ mod tests {
 
     #[test]
     fn a_windows_path_and_a_quote_survive_as_toml() {
-        let declaration = Declaration::new("xmip", "a \"quoted\" place", Purpose::Runtime);
+        let declaration =
+            Declaration::new("xmip", "a \"quoted\" place", Purpose::Runtime).expect("a name");
         let text = declaration.to_toml(7, 1_800_000_000, "C:\\Program Files\\Xmip\\xmip.exe");
 
         assert!(
@@ -292,7 +327,8 @@ mod tests {
 
     #[test]
     fn every_control_character_is_escaped_as_toml_requires() {
-        let declaration = Declaration::new("xmip", "a\rb\tc\u{0}d\u{7f}", Purpose::Runtime);
+        let declaration =
+            Declaration::new("xmip", "a\rb\tc\u{0}d\u{7f}", Purpose::Runtime).expect("a name");
         let text = declaration.to_toml(7, 1_800_000_000, "C:\\x\ny");
 
         assert!(
@@ -307,7 +343,7 @@ mod tests {
     fn what_else_a_process_says_follows_the_six_and_takes_none_of_their_keys() {
         let scope = configure::fixture::test_cluster().scope();
         let declaration = Declaration::new("xmip-essentials-node", &scope, Purpose::Test)
-            .with("stress", "calm")
+            .and_then(|said| said.with("stress", "calm"))
             .and_then(|said| said.with("rounds", "0"))
             .expect("two bare keys");
         let text = declaration.to_toml(7, 1, "node");
@@ -318,10 +354,37 @@ mod tests {
         );
 
         for refused in ["pid", "name", "a b", "", "x=y"] {
-            let said = Declaration::new("xmip", "", Purpose::Runtime).with(refused, "1");
+            let said = Declaration::new("xmip", "", Purpose::Runtime)
+                .and_then(|declaration| declaration.with(refused, "1"));
             assert!(
                 said.is_err_and(|why| why.starts_with("REFUSED")),
                 "{refused}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_name_that_would_leave_the_directory_is_refused_and_nothing_is_written() {
+        let directory = scratch("escape");
+        for refused in [
+            "../x",
+            "xmip-../x",
+            "xmip-a/b",
+            "xmip-a\\b",
+            "xmip-.",
+            "xmip-",
+            "xmipx",
+            "",
+            "/etc/x",
+        ] {
+            let why = Declaration::new(refused, "xmip:///", Purpose::Test).expect_err(refused);
+            assert!(why.starts_with("REFUSED"), "{why}");
+        }
+        assert!(!directory.exists(), "nothing was written");
+        for named in ["xmip", "xmip-cli", "xmip-essentials-W1-roll"] {
+            assert!(
+                Declaration::new(named, "", Purpose::Test).is_ok(),
+                "{named}"
             );
         }
     }

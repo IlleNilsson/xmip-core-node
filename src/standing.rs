@@ -69,7 +69,7 @@ impl Standing {
             }
         }
 
-        let mut declaration = Declaration::new(name?, location?, purpose?);
+        let mut declaration = Declaration::new(name?, location?, purpose?).ok()?;
         declaration.said = said;
 
         Some(Self {
@@ -132,7 +132,7 @@ mod tests {
     fn what_a_process_declared_is_read_back_whole() {
         let directory = scratch("whole");
         let declared = Declaration::new("xmip-essentials-node", "a \"b\"\\c", Purpose::Test)
-            .with("online", "true")
+            .and_then(|declaration| declaration.with("online", "true"))
             .expect("a bare key")
             .declare_in(&directory)
             .expect("declared");
