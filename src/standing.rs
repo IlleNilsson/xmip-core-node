@@ -82,7 +82,7 @@ impl Standing {
     }
 }
 
-/// Every declaration that stands in `directory`, one per `xmip-*.xmip` file
+/// Every declaration that stands in `directory`, one per `xmip-*.toml` file
 /// that holds one, by file name. A directory that is not there holds none;
 /// a file that is not a declaration, or went while it was read — a process
 /// ending takes its file with it — is passed over.
@@ -102,7 +102,7 @@ pub fn standing(directory: &Path) -> Vec<Standing> {
                     name.starts_with("xmip-")
                         && Path::new(name)
                             .extension()
-                            .is_some_and(|extension| extension.eq_ignore_ascii_case("xmip"))
+                            .is_some_and(|extension| extension.eq_ignore_ascii_case("toml"))
                 })
         })
         .collect();
@@ -154,14 +154,14 @@ mod tests {
     fn a_file_that_is_no_declaration_and_a_missing_directory_hold_none() {
         let directory = scratch("strangers");
         fs::create_dir_all(&directory).expect("made");
-        fs::write(directory.join("xmip-a-1.xmip"), "name = \"x\"\n").expect("no pid");
-        fs::write(directory.join("xmip-b-2.xmip"), "not toml at all").expect("written");
+        fs::write(directory.join("xmip-a-1.toml"), "name = \"x\"\n").expect("no pid");
+        fs::write(directory.join("xmip-b-2.toml"), "not toml at all").expect("written");
         fs::write(
-            directory.join("xmip-c-3.xmip"),
+            directory.join("xmip-c-3.toml"),
             "name = \"x\"\nlocation = \"\"\npurpose = \"production\"\npid = 3\n",
         )
         .expect("an unknown purpose");
-        fs::write(directory.join("other-4.xmip"), "").expect("not xmip-*");
+        fs::write(directory.join("other-4.toml"), "").expect("not xmip-*");
 
         assert_eq!(standing(&directory), [] as [Standing; 0]);
         assert_eq!(standing(&directory.join("nowhere")), [] as [Standing; 0]);

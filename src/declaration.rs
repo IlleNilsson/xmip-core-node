@@ -174,7 +174,7 @@ impl Declaration {
         fs::create_dir_all(directory)?;
 
         let pid = process::id();
-        let file = directory.join(format!("{}-{pid}.xmip", self.name));
+        let file = directory.join(format!("{}-{pid}.toml", self.name));
         // The file counts whole seconds; the clock is the estate's one.
         let started = u64::try_from(SystemClock.unix_seconds()).unwrap_or(0);
         let path = env::current_exe()
@@ -278,7 +278,7 @@ mod tests {
         let text = fs::read_to_string(&file).expect("the file");
 
         assert!(
-            file.ends_with(format!("{name}-{}.xmip", process::id())),
+            file.ends_with(format!("{name}-{}.toml", process::id())),
             "{}",
             file.display()
         );

@@ -52,4 +52,4 @@ are `xmip-core-runtime`'s. A Node does not hold cluster membership — the
 Cluster does — and it does not decide where work runs.
 
 `doc/architecture/deployment-model.md` section 3 governs the roles a node
-combines; `architecture.xmip` carries the maturity.
+combines; `architecture.toml` carries the maturity.
