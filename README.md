@@ -22,9 +22,11 @@ module call rather than keep a copy.
 
 `Stage` is a stage of the message path — `receive`, `process`, `send` — and
 the scope segment it is named by; a node does not declare one. A stage says
-whether an operator may pause it (`pausable`) and what a thing configured at
-it is called (`location`), and its words are `xmip_stage_words_v1`, all
-forwarded the same way.
+whether an operator may pause it (`pausable`), what a thing configured at
+it is called (`location`: Receive Location, Subscription, Send Port) and
+how a person reads it (`title`: Receive, Work Process, Send — never a bare
+Process), and its words are `xmip_stage_words_v1`, all forwarded the same
+way (`xmip_stage_title_v1`; ADR-0027, amendment 2026-11-11).
 
 `Capability` is what a node declares — its roles and whether it may assume
 the internet — and the two forms it is said in: the evidence a node
