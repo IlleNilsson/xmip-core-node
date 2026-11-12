@@ -7,9 +7,12 @@
 //! 2026-10-01). The stage words are the scope segments, exact lowercase.
 //!
 //! No other language writes the words or the facts of a stage again: the
-//! runtime's library forwards [`Stage::WORDS`], [`Stage::pausable`] and
-//! [`Stage::location`] to the surfaces (`xmip_operate.h` section 7), and
-//! `Xmip.Surface` calls those (ADR-0056, amendment 2026-09-24).
+//! runtime's library forwards [`Stage::WORDS`], [`Stage::title`],
+//! [`Stage::pausable`] and [`Stage::location`] to the surfaces
+//! (`xmip_operate.h` section 7), and `Xmip.Surface` calls those (ADR-0056,
+//! amendment 2026-09-24). The word is the scope's; the title is what a person
+//! reads: the process stage is the Work Process, never a bare Process
+//! (ADR-0018, amendment 2026-10-06; ADR-0027, amendment 2026-11-11).
 
 /// A stage of the message path, in path order.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -35,6 +38,18 @@ impl Stage {
             Stage::Receive => "receive",
             Stage::Process => "process",
             Stage::Send => "send",
+        }
+    }
+
+    /// The stage as a person reads it on a card, a drawing or a heading:
+    /// Receive, Work Process, Send. The owner, 2026-11-10: *it is "Work
+    /// Process", never "Process"*. A scope keeps the [`name`](Self::name).
+    #[must_use]
+    pub const fn title(self) -> &'static str {
+        match self {
+            Stage::Receive => "Receive",
+            Stage::Process => "Work Process",
+            Stage::Send => "Send",
         }
     }
 
@@ -64,14 +79,19 @@ impl Stage {
         matches!(self, Self::Receive | Self::Send)
     }
 
-    /// What a thing configured at the stage is called: a receive location,
-    /// a Work Process, a send location (ADR-0027 clause 4).
+    /// What a thing directly beneath the stage's scope is called, in the
+    /// owner's capitals: a Receive Location; a Subscription — what the
+    /// process stage routes by, beneath which its scopes sit until a Work
+    /// Process is placed; and a Send Port — what a Subscription routes to,
+    /// never a Send Location, each Send Location of a Port named apart from
+    /// it published beneath that Port (ADR-0027 clause 4, amendment
+    /// 2026-11-11).
     #[must_use]
     pub const fn location(self) -> &'static str {
         match self {
-            Self::Receive => "receive location",
-            Self::Process => "work process",
-            Self::Send => "send location",
+            Self::Receive => "Receive Location",
+            Self::Process => "Subscription",
+            Self::Send => "Send Port",
         }
     }
 }
@@ -92,7 +112,16 @@ mod tests {
         assert_eq!(Stage::ALL.map(Stage::pausable), [true, false, true]);
         assert_eq!(
             Stage::ALL.map(Stage::location),
-            ["receive location", "work process", "send location"]
+            ["Receive Location", "Subscription", "Send Port"]
         );
+    }
+
+    #[test]
+    fn the_process_stage_reads_as_the_work_process_and_keeps_its_word() {
+        assert_eq!(
+            Stage::ALL.map(Stage::title),
+            ["Receive", "Work Process", "Send"]
+        );
+        assert_eq!(Stage::Process.name(), "process", "the scope keeps its word");
     }
 }
