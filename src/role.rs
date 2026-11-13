@@ -109,6 +109,43 @@ impl NodeRole {
         }
     }
 
+    /// What a node declaring the role is for, in the words every surface
+    /// shows a node's purpose in — on hover over it on the Topology and the
+    /// Monitor, Web and Desktop alike, and beside it in the command line's
+    /// and PowerShell's node rows (the owner, 2026-11-12: *There has to be a
+    /// tooltip, regardless of Web or MAUI. what are nodes purpose*). Worded
+    /// from `deployment-model.md` section 3's *May* column; said here once.
+    #[must_use]
+    pub const fn meaning(self) -> &'static str {
+        match self {
+            Self::Operational => "changes runtime state or an operational outcome",
+            Self::Monitoring => "inspects runtime state: health, figures, history, lineage",
+            Self::Receiving => "takes Streams in and makes Messages",
+            Self::Processing => "routes and transforms Messages by Subscription",
+            Self::Sending => "delivers Messages out",
+            Self::Executing => "receives, processes and sends in one process",
+            Self::Development => "exercises Xmip from outside",
+            Self::Storage => "is the doorway to all storage: Xmip Storage",
+        }
+    }
+
+    /// What a node declaring `roles` is for: each role said as
+    /// [`said`](Self::said) says them, with its [`meaning`](Self::meaning),
+    /// one per line; a node declaring none says so, since declaring none is
+    /// a choice, not an absence. The one purpose every surface shows
+    /// (`xmip_role_purpose_v1`, `xmip_operate.h` section 7).
+    #[must_use]
+    pub fn purpose(roles: &[NodeRole]) -> String {
+        let said = Self::said(roles);
+        if said.is_empty() {
+            return "declares no role".to_string();
+        }
+        said.iter()
+            .map(|role| format!("{}: {}", role.name(), role.meaning()))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
     /// The role that serves exactly `stage`.
     #[must_use]
     pub const fn serving(stage: Stage) -> Self {
@@ -197,6 +234,24 @@ mod tests {
             Ok(vec![NodeRole::Processing, NodeRole::Sending])
         );
         assert_eq!(NodeRole::Operational.stages(), []);
+    }
+
+    #[test]
+    fn every_role_has_a_meaning_and_a_purpose_says_each_once_in_order() {
+        for role in NodeRole::ALL {
+            assert!(!role.meaning().is_empty(), "{}", role.name());
+        }
+        assert_eq!(
+            NodeRole::purpose(&[NodeRole::Monitoring, NodeRole::Operational]),
+            "operational: changes runtime state or an operational outcome\n\
+             monitoring: inspects runtime state: health, figures, history, lineage"
+        );
+        assert_eq!(
+            NodeRole::purpose(&[NodeRole::Sending, NodeRole::Receiving, NodeRole::Processing]),
+            "executing: receives, processes and sends in one process",
+            "the three said as their sum"
+        );
+        assert_eq!(NodeRole::purpose(&[]), "declares no role");
     }
 
     #[test]
