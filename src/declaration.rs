@@ -3,30 +3,18 @@
 //! with that a reader would otherwise have to dig out of its command line.
 //!
 //! The name finds a process — every one is `xmip` or `xmip-<what>` — and the
-//! declaration says what it is for. A process writes it where it starts, to
-//! one file named for it and its pid, and takes it away where it ends; a
-//! process that is killed leaves its file behind, and whoever lists the
-//! declarations drops the ones whose process is gone. The directory is the
-//! node's to say, in `XMIP_PROCESS_DIRECTORY`; unset, it is `xmip/process`
-//! under the system's temporary directory, the same for every process on the
-//! machine, so that a reader and a writer who were told nothing still meet.
-//!
-//! No other language writes or reads a declaration again: the runtime's
-//! library forwards [`Declaration::declare`] and [`crate::standing`] to the
+//! declaration says what it is for. This is what a declaration is and the
+//! text it is written as ([`Declaration::to_toml`]); the file a process
+//! writes it to where it starts and takes away where it ends, its
+//! directory, and the listing of every declaration standing there are the
+//! runtime's (`xmip-core-runtime`'s `declared`), which forwards them to the
 //! surfaces as `xmip_process_declare_v1` and `xmip_process_declarations_v1`
-//! (`xmip_operate.h` section 13), and `Xmip.Surface` and the estate's
-//! PowerShell module call those. Until 2026-09-27 .NET wrote the file again
-//! and PowerShell read it with a TOML reader of its own.
+//! (`xmip_operate.h` section 13). A definition opens no file (ADR-0058
+//! clause 1, amendment 2026-11-13). Until 2026-09-27 .NET wrote the file
+//! again and PowerShell read it with a TOML reader of its own.
 
 use codec::toml::quote;
 use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
-use std::{env, fs, io, process};
-use xcore::{Clock, SystemClock};
-
-/// The environment variable that names the directory declarations are
-/// written to.
-pub const DIRECTORY_VARIABLE: &str = "XMIP_PROCESS_DIRECTORY";
 
 /// The keys every declaration writes, which nothing else it says may take.
 pub const KEYS: [&str; 6] = ["name", "location", "purpose", "pid", "started_unix", "path"];
@@ -155,36 +143,6 @@ impl Declaration {
         Ok(self)
     }
 
-    /// Declare this process in the directory the node names.
-    ///
-    /// # Errors
-    ///
-    /// The directory could not be made or the file could not be written. A
-    /// process that cannot declare itself still runs; its caller says so.
-    pub fn declare(&self) -> io::Result<Declared> {
-        self.declare_in(&directory())
-    }
-
-    /// Declare this process in a given directory.
-    ///
-    /// # Errors
-    ///
-    /// The directory could not be made or the file could not be written.
-    pub fn declare_in(&self, directory: &Path) -> io::Result<Declared> {
-        fs::create_dir_all(directory)?;
-
-        let pid = process::id();
-        let file = directory.join(format!("{}-{pid}.toml", self.name));
-        // The file counts whole seconds; the clock is the estate's one.
-        let started = u64::try_from(SystemClock.unix_seconds()).unwrap_or(0);
-        let path = env::current_exe()
-            .map(|path| path.display().to_string())
-            .unwrap_or_default();
-
-        fs::write(&file, self.to_toml(pid, started, &path))?;
-        Ok(Declared { file })
-    }
-
     /// The declaration as the TOML a reader takes: the three things, which
     /// process said so, when, and from where on disk, then what else it said.
     #[must_use]
@@ -207,61 +165,12 @@ impl Declaration {
     }
 }
 
-/// A declaration that stands while this is held and is taken away when it
-/// is dropped.
-#[derive(Debug)]
-pub struct Declared {
-    file: PathBuf,
-}
-
-impl Declared {
-    /// The file the declaration was written to.
-    #[must_use]
-    pub fn file(&self) -> &Path {
-        &self.file
-    }
-
-    /// Leave the declaration standing and hand its file to a holder across
-    /// the C boundary, which takes it away where its process ends.
-    #[must_use]
-    pub fn handed_over(mut self) -> PathBuf {
-        // What is dropped then names no file, and removing it removes nothing.
-        std::mem::take(&mut self.file)
-    }
-}
-
-impl Drop for Declared {
-    fn drop(&mut self) {
-        // Gone already is as good as removed.
-        let _ = fs::remove_file(&self.file);
-    }
-}
-
-/// Where declarations are written: what the node names, else `xmip/process`
-/// under the system's temporary directory.
-#[must_use]
-pub fn directory() -> PathBuf {
-    env::var_os(DIRECTORY_VARIABLE)
-        .filter(|named| !named.is_empty())
-        .map_or_else(
-            || env::temp_dir().join("xmip").join("process"),
-            PathBuf::from,
-        )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn scratch(name: &str) -> PathBuf {
-        let directory = env::temp_dir().join("xmip-declaration-test").join(name);
-        let _ = fs::remove_dir_all(&directory);
-        directory
-    }
-
     #[test]
-    fn a_declaration_stands_while_held_and_is_gone_when_dropped() {
-        let directory = scratch("held");
+    fn a_declaration_says_its_three_things_and_which_process_said_them() {
         // The name is whatever the operator called the node, and nothing here
         // reads anything out of it (ADR-0053).
         let cluster = configure::fixture::test_cluster();
@@ -273,39 +182,16 @@ mod tests {
         let location = cluster.node_scope(0);
         let declaration = Declaration::new(&name, &location, Purpose::Test).expect("a name");
 
-        let declared = declaration.declare_in(&directory).expect("declared");
-        let file = declared.file().to_path_buf();
-        let text = fs::read_to_string(&file).expect("the file");
+        let text = declaration.to_toml(4242, 1_800_000_000, "node");
 
-        assert!(
-            file.ends_with(format!("{name}-{}.toml", process::id())),
-            "{}",
-            file.display()
-        );
         assert!(text.contains(&format!("name = \"{name}\"")), "{text}");
         assert!(
             text.contains(&format!("location = \"{location}\"")),
             "{text}"
         );
         assert!(text.contains("purpose = \"test\""), "{text}");
-        assert!(text.contains(&format!("pid = {}", process::id())), "{text}");
-
-        drop(declared);
-        assert!(!file.exists(), "taken away where the process ends");
-    }
-
-    #[test]
-    fn a_declaration_handed_over_stands_until_its_holder_takes_it_away() {
-        let directory = scratch("handed");
-        let declared = Declaration::new("xmip", "xmip:///", Purpose::Runtime)
-            .expect("a name")
-            .declare_in(&directory)
-            .expect("declared");
-
-        let file = declared.handed_over();
-
-        assert!(file.exists(), "a holder across the boundary removes it");
-        fs::remove_file(file).expect("removed by its holder");
+        assert!(text.contains("pid = 4242"), "{text}");
+        assert!(text.contains("started_unix = 1800000000"), "{text}");
     }
 
     #[test]
@@ -364,8 +250,7 @@ mod tests {
     }
 
     #[test]
-    fn a_name_that_would_leave_the_directory_is_refused_and_nothing_is_written() {
-        let directory = scratch("escape");
+    fn a_name_that_would_leave_the_directory_is_refused() {
         for refused in [
             "../x",
             "xmip-../x",
@@ -380,7 +265,6 @@ mod tests {
             let why = Declaration::new(refused, "xmip:///", Purpose::Test).expect_err(refused);
             assert!(why.starts_with("REFUSED"), "{why}");
         }
-        assert!(!directory.exists(), "nothing was written");
         for named in ["xmip", "xmip-cli", "xmip-essentials-W1-roll"] {
             assert!(
                 Declaration::new(named, "", Purpose::Test).is_ok(),

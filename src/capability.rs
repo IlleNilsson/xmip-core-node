@@ -122,6 +122,26 @@ impl Capability {
         self.roles.contains(&NodeRole::Executing)
     }
 
+    /// Whether the node carries an operator's act to another node — writes
+    /// it to Xmip Storage, asked of the node that owns what it acts on —
+    /// the operational role, its door for operator acts (ADR-0056 and
+    /// ADR-0014, amendments 2026-11-13). Every node takes the acts asked of
+    /// itself, whatever it declares.
+    #[must_use]
+    pub fn carries_acts(&self) -> bool {
+        self.roles.contains(&NodeRole::Operational)
+    }
+
+    /// Whether the node gathers its cluster's view — follows every member's
+    /// publication over its operate listener as an Observer, and answers
+    /// the cluster's — and is listed an Observer on every node: the
+    /// monitoring role (ADR-0027 decision 8, ADR-0056 and ADR-0009,
+    /// amendments 2026-11-13).
+    #[must_use]
+    pub fn gathers(&self) -> bool {
+        self.roles.contains(&NodeRole::Monitoring)
+    }
+
     /// Whether no role of the node serves a stage of the message path — it
     /// runs whole tests itself, as every node did before capabilities.
     #[must_use]
@@ -252,6 +272,34 @@ mod tests {
         let watching = Capability::parse("monitoring,operational").expect("two roles");
         assert_eq!(watching.words(), "operational,monitoring");
         assert!(watching.declares_no_stage());
+    }
+
+    #[test]
+    fn only_the_operational_role_carries_an_act_to_another_node() {
+        assert!(Capability::of(&[NodeRole::Operational]).carries_acts());
+        let edge = Capability::parse("executing,monitoring,operational").expect("an edge node");
+        assert!(edge.carries_acts());
+        for alone in NodeRole::ALL
+            .into_iter()
+            .filter(|role| *role != NodeRole::Operational)
+        {
+            assert!(!Capability::of(&[alone]).carries_acts(), "{alone:?}");
+        }
+        assert!(!Capability::none().carries_acts());
+    }
+
+    #[test]
+    fn only_the_monitoring_role_gathers_the_cluster() {
+        assert!(Capability::of(&[NodeRole::Monitoring]).gathers());
+        let edge = Capability::parse("executing,monitoring,operational").expect("an edge node");
+        assert!(edge.gathers());
+        for alone in NodeRole::ALL
+            .into_iter()
+            .filter(|role| *role != NodeRole::Monitoring)
+        {
+            assert!(!Capability::of(&[alone]).gathers(), "{alone:?}");
+        }
+        assert!(!Capability::none().gathers());
     }
 
     #[test]

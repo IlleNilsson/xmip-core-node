@@ -1,15 +1,13 @@
 //! A declaration read back: what a System Process said of itself, which
 //! process said it, when, from where on disk, and the file it stands in
-//! (ADR-0053 clause 3). The one reader of the file
-//! [`Declaration::declare_in`] writes; the runtime's library forwards
-//! [`standing`] to the surfaces as `xmip_process_declarations_v1`.
-//!
-//! Whether the process that wrote a file still runs is not decided here: a
-//! reader that can see the operating system's processes drops the files of
-//! the ones that are gone.
+//! (ADR-0053 clause 3). The one reading of the text
+//! [`Declaration::to_toml`] writes; finding the files in their directory
+//! and reading each is the runtime's (`xmip-core-runtime`'s
+//! `declared::standing`), which forwards them to the surfaces as
+//! `xmip_process_declarations_v1` (ADR-0058 clause 1, amendment
+//! 2026-11-13).
 
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use codec::toml::unquote;
 
@@ -82,88 +80,45 @@ impl Standing {
     }
 }
 
-/// Every declaration that stands in `directory`, one per `xmip-*.toml` file
-/// that holds one, by file name. A directory that is not there holds none;
-/// a file that is not a declaration, or went while it was read — a process
-/// ending takes its file with it — is passed over.
-#[must_use]
-pub fn standing(directory: &Path) -> Vec<Standing> {
-    let Ok(entries) = fs::read_dir(directory) else {
-        return Vec::new();
-    };
-
-    let mut files: Vec<PathBuf> = entries
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.file_name()
-                .and_then(|name| name.to_str())
-                .is_some_and(|name| {
-                    name.starts_with("xmip-")
-                        && Path::new(name)
-                            .extension()
-                            .is_some_and(|extension| extension.eq_ignore_ascii_case("toml"))
-                })
-        })
-        .collect();
-    files.sort();
-
-    files
-        .into_iter()
-        .filter_map(|file| {
-            let text = fs::read_to_string(&file).ok()?;
-            Standing::read(&text, file)
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env;
-
-    fn scratch(name: &str) -> PathBuf {
-        let directory = env::temp_dir().join("xmip-standing-test").join(name);
-        let _ = fs::remove_dir_all(&directory);
-        directory
-    }
 
     #[test]
     fn what_a_process_declared_is_read_back_whole() {
-        let directory = scratch("whole");
-        let declared = Declaration::new("xmip-essentials-node", "a \"b\"\\c", Purpose::Test)
+        let declaration = Declaration::new("xmip-essentials-node", "a \"b\"\\c", Purpose::Test)
             .and_then(|declaration| declaration.with("online", "true"))
-            .expect("a bare key")
-            .declare_in(&directory)
-            .expect("declared");
+            .expect("a bare key");
+        let file = PathBuf::from("xmip-essentials-node-7.toml");
 
-        let read = standing(&directory);
+        let read = Standing::read(&declaration.to_toml(7, 1_800_000_000, "node"), file.clone())
+            .expect("a declaration");
 
-        assert_eq!(read.len(), 1);
-        assert_eq!(read[0].declaration.location, "a \"b\"\\c");
-        assert_eq!(read[0].declaration.purpose, Purpose::Test);
         assert_eq!(
-            read[0].declaration.said,
-            vec![("online".to_string(), "true".to_string())]
+            read,
+            Standing {
+                declaration,
+                pid: 7,
+                started_unix: 1_800_000_000,
+                path: "node".to_string(),
+                file,
+            }
         );
-        assert_eq!(read[0].pid, std::process::id());
-        assert_eq!(read[0].file, declared.file());
     }
 
     #[test]
-    fn a_file_that_is_no_declaration_and_a_missing_directory_hold_none() {
-        let directory = scratch("strangers");
-        fs::create_dir_all(&directory).expect("made");
-        fs::write(directory.join("xmip-a-1.toml"), "name = \"x\"\n").expect("no pid");
-        fs::write(directory.join("xmip-b-2.toml"), "not toml at all").expect("written");
-        fs::write(
-            directory.join("xmip-c-3.toml"),
+    fn a_text_that_is_no_declaration_reads_as_none() {
+        for stranger in [
+            "name = \"x\"\n",
+            "not toml at all",
             "name = \"x\"\nlocation = \"\"\npurpose = \"production\"\npid = 3\n",
-        )
-        .expect("an unknown purpose");
-        fs::write(directory.join("other-4.toml"), "").expect("not xmip-*");
-
-        assert_eq!(standing(&directory), [] as [Standing; 0]);
-        assert_eq!(standing(&directory.join("nowhere")), [] as [Standing; 0]);
+            "",
+        ] {
+            assert_eq!(
+                Standing::read(stranger, PathBuf::from("xmip-x-3.toml")),
+                None,
+                "{stranger}"
+            );
+        }
     }
 }
