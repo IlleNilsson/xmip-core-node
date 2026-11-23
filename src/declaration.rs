@@ -22,7 +22,7 @@ pub const KEYS: [&str; 6] = ["name", "location", "purpose", "pid", "started_unix
 /// What a System Process is for.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Purpose {
-    /// The Essentials and everything it spawns, and whatever a test started.
+    /// The System Tests and everything they spawn, and whatever a test started.
     Test,
     /// Everything else: the product doing its work.
     Runtime,
@@ -72,13 +72,13 @@ pub struct Declaration {
     /// Test or runtime.
     pub purpose: Purpose,
     /// What else it says of itself, key to text, in the order it said it: a
-    /// Essentials node its flags, so no reader parses its command line.
+    /// System Tests node its flags, so no reader parses its command line.
     pub said: Vec<(String, String)>,
 }
 
 /// Why `name` is no System Process's name, if it is not: `xmip`, or `xmip-`
 /// and letters, digits and hyphens (ADR-0053 clauses 1 and 4; the cluster
-/// and the node in an Essentials name keep their case). The name becomes
+/// and the node in a System Tests name keep their case). The name becomes
 /// the declaration's file name, so nothing else ever reaches the path.
 fn refusal(name: &str) -> Option<String> {
     let shaped = name == "xmip"
@@ -175,7 +175,7 @@ mod tests {
         // reads anything out of it (ADR-0053).
         let cluster = configure::fixture::test_cluster();
         let name = format!(
-            "xmip-essentials-{}-node-{}",
+            "xmip-system-test-{}-node-{}",
             cluster.name,
             cluster.node(0).name
         );
@@ -228,7 +228,7 @@ mod tests {
     #[test]
     fn what_else_a_process_says_follows_the_six_and_takes_none_of_their_keys() {
         let scope = configure::fixture::test_cluster().scope();
-        let declaration = Declaration::new("xmip-essentials-node", &scope, Purpose::Test)
+        let declaration = Declaration::new("xmip-system-test-node", &scope, Purpose::Test)
             .and_then(|said| said.with("stress", "calm"))
             .and_then(|said| said.with("rounds", "0"))
             .expect("two bare keys");
@@ -265,7 +265,7 @@ mod tests {
             let why = Declaration::new(refused, "xmip:///", Purpose::Test).expect_err(refused);
             assert!(why.starts_with("REFUSED"), "{why}");
         }
-        for named in ["xmip", "xmip-cli", "xmip-essentials-W1-roll"] {
+        for named in ["xmip", "xmip-cli", "xmip-system-test-W1-roll"] {
             assert!(
                 Declaration::new(named, "", Purpose::Test).is_ok(),
                 "{named}"

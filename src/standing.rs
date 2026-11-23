@@ -86,10 +86,10 @@ mod tests {
 
     #[test]
     fn what_a_process_declared_is_read_back_whole() {
-        let declaration = Declaration::new("xmip-essentials-node", "a \"b\"\\c", Purpose::Test)
+        let declaration = Declaration::new("xmip-system-test-node", "a \"b\"\\c", Purpose::Test)
             .and_then(|declaration| declaration.with("online", "true"))
             .expect("a bare key");
-        let file = PathBuf::from("xmip-essentials-node-7.toml");
+        let file = PathBuf::from("xmip-system-test-node-7.toml");
 
         let read = Standing::read(&declaration.to_toml(7, 1_800_000_000, "node"), file.clone())
             .expect("a declaration");
