@@ -11,19 +11,28 @@
 //!     (amendment 2026-10-01: the stage words a node used to declare were the
 //!     same thing under a second name, and are gone). A node that declares no
 //!     stage-serving role runs whole tests itself.
-//!   - **Online capability** — whether a route off this machine may be
-//!     assumed (ADR-0045).
+//!   - **Node capabilities** — words naming what the node's environment
+//!     gives it, a firewall opening, software installed, a system it
+//!     reaches ([`Capability::node_capabilities`]). A node's roles are
+//!     Xmip's; its Node capabilities are named by whoever runs it. Xmip
+//!     reads no meaning from one: it only matches the words a node declares
+//!     against those its work requires (amendment 2026-11-24). One Xmip
+//!     asks after itself, [`ONLINE`], a route off the machine (ADR-0045);
+//!     a node declaring nothing is offline. They are the cluster's file's,
+//!     and a node publishes them with its roles.
 //!
 //! Authentication and runtime capability are not modeled, and the evidence a
 //! node publishes says so rather than staying silent.
 //!
 //! A declaration is said in two forms, each written and read here and
 //! nowhere else (open problem 25): the **evidence** a node publishes about
-//! itself — `declares receiving,sending; online; …` — and the **entry** a run
-//! lists it by — `<name>=receiving+sending`, or the bare name for a node
-//! that declares no role. The runtime's library forwards both readings to the
-//! surfaces (`xmip_capability_published_v1`, `xmip_capability_entry_v1`,
-//! `xmip_operate.h` section 7), so `Xmip.Surface` keeps no parse of its own.
+//! itself — `declares receiving,sending; Node capabilities online; …` — and
+//! the **entry** a run lists it by — `<name>=receiving+sending`, or the bare
+//! name for a node that declares no role, its Node capabilities an entry of
+//! their own, `<name>=online`. The runtime's library forwards both readings
+//! to the surfaces (`xmip_capability_published_v1`,
+//! `xmip_capability_entry_v1`, `xmip_operate.h` section 7), so
+//! `Xmip.Surface` keeps no parse of its own.
 
 use crate::{NodeRole, Stage};
 
@@ -33,22 +42,35 @@ const NO_ROLE: &str = "no role";
 /// What the evidence of a declaration starts with.
 const DECLARES: &str = "declares ";
 
+/// What the evidence says a node's Node capabilities after.
+const NODE_CAPABILITIES: &str = "Node capabilities ";
+
+/// What the evidence says of a node declaring no Node capability.
+const NO_NODE_CAPABILITY: &str = "no Node capability";
+
+/// The one Node capability Xmip itself asks after: a route off the machine,
+/// the internet (ADR-0045; ADR-0056, amendment 2026-11-24: *An obvious node
+/// capability is online, internet access*). A node declares it as any other,
+/// and one that declares nothing is offline. Every other Node capability is
+/// whoever runs the node's.
+pub const ONLINE: &str = "online";
+
 /// What one node declared.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Capability {
-    /// Online capability: a route off this machine may be assumed.
-    online: bool,
     /// The node's roles, as [`NodeRole::said`] says them.
     roles: Vec<NodeRole>,
+    /// Its Node capabilities, in the order declared.
+    declared: Vec<String>,
 }
 
 impl Capability {
-    /// A node that declares nothing: no role, offline.
+    /// A node that declares nothing: no role, no Node capability, offline.
     #[must_use]
     pub const fn none() -> Self {
         Self {
-            online: false,
             roles: Vec::new(),
+            declared: Vec::new(),
         }
     }
 
@@ -56,9 +78,58 @@ impl Capability {
     #[must_use]
     pub fn of(roles: &[NodeRole]) -> Self {
         Self {
-            online: false,
             roles: NodeRole::said(roles),
+            declared: Vec::new(),
         }
+    }
+
+    /// `words` read as Node capabilities, as a node declares them or work
+    /// requires them: each a word of lowercase letters, digits and hyphens,
+    /// opening and closing with a letter or a digit, none twice (ADR-0056,
+    /// amendment 2026-11-24). Xmip reads no meaning from one.
+    ///
+    /// # Errors
+    ///
+    /// REFUSED, naming the word that is none, or the word named twice.
+    pub fn node_capabilities(words: &[String]) -> Result<Vec<String>, String> {
+        let mut read: Vec<String> = Vec::with_capacity(words.len());
+        for word in words {
+            let inner = word
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-');
+            let end = |byte: Option<u8>| byte.is_some_and(|byte| byte != b'-');
+            if !(inner && end(word.bytes().next()) && end(word.bytes().last())) {
+                return Err(format!(
+                    "REFUSED: '{word}' is no Node capability: a Node capability is a word of \
+                     lowercase letters, digits and hyphens, opening and closing with a letter or \
+                     a digit"
+                ));
+            }
+            if read.contains(word) {
+                return Err(format!(
+                    "REFUSED: the Node capability '{word}' is named twice"
+                ));
+            }
+            read.push(word.clone());
+        }
+        Ok(read)
+    }
+
+    /// The same declaration with its Node capabilities
+    /// ([`Capability::node_capabilities`]).
+    ///
+    /// # Errors
+    ///
+    /// As [`Capability::node_capabilities`] refuses them.
+    pub fn with_declared(mut self, words: &[String]) -> Result<Self, String> {
+        self.declared = Self::node_capabilities(words)?;
+        Ok(self)
+    }
+
+    /// Its Node capabilities, in the order declared.
+    #[must_use]
+    pub fn declared(&self) -> &[String] {
+        &self.declared
     }
 
     /// The node serving these stages: the role serving each, said as one
@@ -79,19 +150,6 @@ impl Capability {
     /// are (ADR-0055).
     pub fn parse(raw: &str) -> Result<Self, String> {
         NodeRole::declared(raw).map(|roles| Self::of(&roles))
-    }
-
-    /// The same declaration with its online capability said (ADR-0045).
-    #[must_use]
-    pub fn with_online(mut self, online: bool) -> Self {
-        self.online = online;
-        self
-    }
-
-    /// Whether a route off this machine may be assumed.
-    #[must_use]
-    pub const fn is_online(&self) -> bool {
-        self.online
     }
 
     /// The node's roles, in declaration order.
@@ -156,14 +214,20 @@ impl Capability {
         self.joined(",")
     }
 
-    /// The word a health record carries for the online capability.
+    /// Its Node capabilities as a record says them: `Node capabilities
+    /// online, erp-direct`, or `no Node capability`.
     #[must_use]
-    pub const fn word(&self) -> &'static str {
-        if self.online { "online" } else { "offline" }
+    pub fn named(&self) -> String {
+        if self.declared.is_empty() {
+            NO_NODE_CAPABILITY.to_string()
+        } else {
+            format!("{NODE_CAPABILITIES}{}", self.declared.join(", "))
+        }
     }
 
     /// What the node's own capability record says, so a surface reads a
-    /// node's roles from the snapshot and never from its name.
+    /// node's roles and Node capabilities from the snapshot and never from
+    /// its name.
     #[must_use]
     pub fn evidence(&self) -> String {
         let declared = if self.roles.is_empty() {
@@ -174,35 +238,55 @@ impl Capability {
         format!(
             "{DECLARES}{declared}; {}; authentication and runtime capability \
              are not declared in this record",
-            self.word()
+            self.named()
         )
     }
 
-    /// The declaration an evidence line says, read through the same parse as
-    /// a declaration. A line that is no declaration at all declares nothing,
-    /// offline unless it says `; online;`.
+    /// The declaration an evidence line says, read through the same parses
+    /// as a declaration. A line that is no declaration at all declares
+    /// nothing, and one that names no Node capability none.
     ///
     /// # Errors
     ///
-    /// When the declaration names a word that is no role: REFUSED, as
-    /// [`NodeRole::declared`] says it — never read as the words that were
-    /// known.
+    /// When the declaration names a word that is no role, or a Node
+    /// capability that is none: REFUSED, as [`NodeRole::declared`] and
+    /// [`Capability::node_capabilities`] say it — never read as the words
+    /// that were known.
     pub fn from_evidence(evidence: &str) -> Result<Self, String> {
-        let said = evidence
+        let mut said = evidence
             .strip_prefix(DECLARES)
-            .and_then(|rest| rest.split(';').next())
-            .unwrap_or_default();
-        let roles = if said == NO_ROLE {
-            Vec::new()
-        } else {
-            NodeRole::declared(said)?
+            .map(|rest| rest.split(';').map(str::trim))
+            .into_iter()
+            .flatten();
+        let roles = match said.next().unwrap_or_default() {
+            NO_ROLE | "" => Vec::new(),
+            words => NodeRole::declared(words)?,
         };
-        Ok(Self::of(&roles).with_online(evidence.contains("; online;")))
+        let declared: Vec<String> = Self::named_in(evidence)
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        Self::of(&roles).with_declared(&declared)
+    }
+
+    /// The Node capabilities an evidence line says, as it writes them and
+    /// unchecked: what [`Capability::from_evidence`] reads, and what a
+    /// surface is handed borrowed from the line (`xmip_operate.h` section
+    /// 7). None where it says none, or is no declaration.
+    #[must_use]
+    pub fn named_in(evidence: &str) -> Vec<&str> {
+        evidence
+            .strip_prefix(DECLARES)
+            .and_then(|rest| rest.split(';').nth(1))
+            .map(str::trim)
+            .and_then(|named| named.strip_prefix(NODE_CAPABILITIES))
+            .map(|words| words.split(", ").collect())
+            .unwrap_or_default()
     }
 
     /// The node as a run lists it: `<name>=receiving+sending`, or the bare
-    /// name when it declares no role. It says nothing of the online
-    /// capability, which a run lists apart.
+    /// name when it declares no role. It says nothing of its Node
+    /// capabilities, which a run lists apart ([`Capability::declared_entry`]).
     #[must_use]
     pub fn entry(&self, name: &str) -> String {
         if self.roles.is_empty() {
@@ -219,6 +303,31 @@ impl Capability {
     pub fn from_entry(entry: &str) -> (&str, Result<Self, String>) {
         let (name, declared) = entry.split_once('=').unwrap_or((entry, ""));
         (name.trim(), Self::parse(declared))
+    }
+
+    /// The node's Node capabilities as a run lists them beside its roles:
+    /// `<name>=online+erp-direct`, or the bare name where it declares none.
+    #[must_use]
+    pub fn declared_entry(&self, name: &str) -> String {
+        if self.declared.is_empty() {
+            name.to_string()
+        } else {
+            format!("{name}={}", self.declared.join("+"))
+        }
+    }
+
+    /// A [`Capability::declared_entry`] read back: the name before the
+    /// first `=`, trimmed, and the Node capabilities the rest says, by `+`,
+    /// read as [`Capability::node_capabilities`] reads them.
+    pub fn from_declared_entry(entry: &str) -> (&str, Result<Vec<String>, String>) {
+        let (name, said) = entry.split_once('=').unwrap_or((entry, ""));
+        let words: Vec<String> = said
+            .split('+')
+            .map(str::trim)
+            .filter(|word| !word.is_empty())
+            .map(str::to_string)
+            .collect();
+        (name.trim(), Self::node_capabilities(&words))
     }
 
     fn joined(&self, separator: &str) -> String {
@@ -302,19 +411,63 @@ mod tests {
         assert!(!Capability::none().gathers());
     }
 
+    /// Online is a Node capability like any other, and a node declaring
+    /// nothing is offline (ADR-0056, amendment 2026-11-24).
     #[test]
-    fn the_online_capability_rides_along() {
-        let capability = Capability::of(&[NodeRole::Processing]).with_online(true);
-        assert!(capability.is_online());
-        assert_eq!(capability.word(), "online");
-        assert_eq!(Capability::none().word(), "offline");
+    fn online_is_a_node_capability_and_nothing_declared_is_offline() {
+        let online = Capability::of(&[NodeRole::Processing])
+            .with_declared(&[ONLINE.to_string()])
+            .expect("a word");
+        assert_eq!(online.declared(), [ONLINE]);
+        assert_eq!(online.named(), "Node capabilities online");
+        assert_eq!(Capability::none().named(), "no Node capability");
+        assert_eq!(
+            Capability::node_capabilities(&[ONLINE.to_string()]),
+            Ok(vec![ONLINE.to_string()])
+        );
+    }
+
+    #[test]
+    fn node_capabilities_are_words_each_once_and_anything_else_is_refused() {
+        let words = |said: &[&str]| said.iter().map(ToString::to_string).collect::<Vec<_>>();
+        let declared = Capability::of(&[NodeRole::Processing])
+            .with_declared(&words(&["order-approval-module", "erp-direct", "tls13"]))
+            .expect("three words");
+        assert_eq!(
+            declared.declared(),
+            words(&["order-approval-module", "erp-direct", "tls13"])
+        );
+        assert_eq!(Capability::none().declared(), [] as [String; 0]);
+        for wrong in [
+            "Firewall",
+            "erp direct",
+            "-erp",
+            "erp-",
+            "",
+            "erp_direct",
+            "érp",
+        ] {
+            let refused = Capability::node_capabilities(&words(&[wrong])).expect_err(wrong);
+            assert!(
+                refused.starts_with(&format!("REFUSED: '{wrong}' is no Node capability")),
+                "{refused}"
+            );
+        }
+        let twice = Capability::node_capabilities(&words(&["erp-direct", "erp-direct"]));
+        assert_eq!(
+            twice,
+            Err("REFUSED: the Node capability 'erp-direct' is named twice".to_string())
+        );
     }
 
     #[test]
     fn what_a_node_publishes_reads_back_as_what_it_declared() {
+        let receiving = Capability::of(&[NodeRole::Receiving])
+            .with_declared(&[ONLINE.to_string(), "firewall-party-x".to_string()])
+            .expect("two words");
         for capability in [
             Capability::none(),
-            Capability::of(&[NodeRole::Receiving]).with_online(true),
+            receiving.clone(),
             Capability::of(&[NodeRole::Executing, NodeRole::Monitoring]),
         ] {
             let evidence = capability.evidence();
@@ -324,6 +477,15 @@ mod tests {
                 "{evidence}"
             );
         }
+        assert_eq!(
+            receiving.evidence(),
+            "declares receiving; Node capabilities online, firewall-party-x; authentication \
+             and runtime capability are not declared in this record"
+        );
+        assert_eq!(
+            Capability::named_in(&receiving.evidence()),
+            [ONLINE, "firewall-party-x"]
+        );
         assert!(
             Capability::of(&[NodeRole::Sending])
                 .evidence()
@@ -332,27 +494,50 @@ mod tests {
         );
         assert_eq!(
             Capability::none().evidence(),
-            "declares no role; offline; authentication and runtime capability are not \
-             declared in this record"
+            "declares no role; no Node capability; authentication and runtime capability are \
+             not declared in this record"
         );
         assert_eq!(Capability::from_evidence("alive"), Ok(Capability::none()));
+        assert_eq!(Capability::named_in("alive"), [] as [&str; 0]);
     }
 
     #[test]
     fn a_published_declaration_reads_by_the_same_rule_as_the_flag() {
         assert_eq!(
-            Capability::from_evidence("declares receiving,sending; offline; x"),
+            Capability::from_evidence("declares receiving,sending; no Node capability; x"),
             Ok(Capability::of(&[NodeRole::Receiving, NodeRole::Sending]))
         );
-        let cased = Capability::from_evidence("declares Receiving,SENDING; offline; x")
+        let cased = Capability::from_evidence("declares Receiving,SENDING; no Node capability; x")
             .expect_err("lowercase only");
         assert!(cased.contains("called Receiving, SENDING;"), "{cased}");
-        let refusal = Capability::from_evidence("declares receive,send; online; x")
+        let upper = Capability::from_evidence("declares receiving; Node capabilities Online; x")
+            .expect_err("a Node capability is lowercase");
+        assert!(upper.contains("'Online' is no Node capability"), "{upper}");
+        let refusal = Capability::from_evidence("declares receive,send; no Node capability; x")
             .expect_err("a stage word is no role");
         assert!(
             refusal.starts_with("REFUSED") && refusal.contains("receive, send"),
             "{refusal}"
         );
+    }
+
+    #[test]
+    fn a_run_lists_a_node_s_node_capabilities_as_an_entry_of_its_own() {
+        let cluster = configure::fixture::test_cluster();
+        let [one, two] = [0, 1].map(|place| cluster.node(place).name.as_str());
+        let words = [ONLINE.to_string(), "erp-direct".to_string()];
+        let declared = Capability::none().with_declared(&words).expect("two words");
+        assert_eq!(
+            declared.declared_entry(one),
+            format!("{one}=online+erp-direct")
+        );
+        assert_eq!(Capability::none().declared_entry(two), two);
+        let said = format!(" {one} =online+erp-direct");
+        let (name, read) = Capability::from_declared_entry(&said);
+        assert_eq!((name, read), (one, Ok(words.to_vec())));
+        assert_eq!(Capability::from_declared_entry(two), (two, Ok(Vec::new())));
+        let (_, refused) = Capability::from_declared_entry(&format!("{one}=Online"));
+        assert!(refused.expect_err("lowercase").starts_with("REFUSED"));
     }
 
     #[test]

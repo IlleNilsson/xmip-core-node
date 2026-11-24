@@ -10,7 +10,7 @@ pub mod standing;
 pub mod unit;
 pub mod wildcard;
 
-pub use capability::Capability;
+pub use capability::{Capability, ONLINE};
 pub use declaration::{Declaration, Purpose};
 pub use requirement::Requirement;
 pub use role::NodeRole;
@@ -24,9 +24,9 @@ use serde::{Deserialize, Serialize};
 use xcore::NodeId;
 
 /// One machine of a cluster, with the roles it carries for its purpose
-/// ([`NodeRole`]; ADR-0052, ruled 2026-09-19). What it can take is what its
-/// roles declare ([`Capability`]), matched against what work requires
-/// ([`Requirement`]; ADR-0056).
+/// ([`NodeRole`]; ADR-0052, ruled 2026-09-19). What it can take is what it
+/// declares ([`Capability`]: its roles and its Node capabilities),
+/// matched against what work requires ([`Requirement`]; ADR-0056).
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Node {
     pub node_id: NodeId,

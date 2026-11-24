@@ -47,20 +47,30 @@ everything else, case-insensitive, `*` crossing a `/`, both sides read as
 scopes first (ADR-0052, amendment 2026-09-19). The audit read filters by it,
 and the runtime forwards it as `xmip_scope_matches_v1`.
 
-`Capability` is what a node declares — its roles and whether it may assume
-the internet — and the two forms it is said in: the evidence a node
-publishes about itself (`evidence`, `from_evidence`) and the entry a run
-lists it by (`entry`, `from_entry`: `RX1=receiving+sending`). The System Tests
-declare through it and the surfaces read through it
-(`xmip_capability_published_v1`, `xmip_capability_entry_v1`).
+`Capability` is what a node declares — its roles, whether it may assume
+the internet, and its Node capabilities (`with_declared`, `declared`) — and
+the two forms it is said in: the evidence a node publishes about itself
+(`evidence`, `from_evidence`) and the entry a run lists it by (`entry`,
+`from_entry`: `RX1=receiving+sending`). The System Tests declare through it
+and the surfaces read through it (`xmip_capability_published_v1`,
+`xmip_capability_entry_v1`). A node's roles are Xmip's; its **Node
+capabilities** name what its environment gives it, a firewall opening or
+software installed, in words of whoever runs it: each lowercase letters,
+digits and hyphens, none twice (`Capability::node_capabilities`, the one
+rule, REFUSED in words otherwise). Xmip reads no meaning from them and only
+matches them; they are the cluster's file's, read where work is placed, and
+neither form says them (ADR-0056, amendment 2026-11-24).
 
 `Requirement` is what a piece of work needs of the node that takes it, in
-the same terms (ADR-0056 clause 3, amendment 2026-11-13): the stage it needs
-served — a Receive Location the receive stage, a Send Port the send stage —
-and whether it needs the online capability. `Capability::satisfies` is the
-one match: one of the node's roles serves the stage, executing serving every
-stage, and the node is online where the work needs it. Which node takes the
-work is `xmip-core-cluster`'s `place`.
+the same terms (ADR-0056 clause 3, amendments 2026-11-13 and 2026-11-24):
+the stage it needs served — a Receive Location the receive stage, a Send
+Port the send stage — and the Node capabilities the node must declare
+(`requiring`), `online` (`node::ONLINE`, `Requirement::online`) among them
+where the work reaches off the machine, the one Xmip asks after itself.
+`Capability::satisfies` is the one match: one of the node's roles serves
+the stage, executing serving every stage, and it declares every Node
+capability the work requires. Which node takes the work is
+`xmip-core-cluster`'s `place`.
 
 A System Process's declaration (ADR-0053) is TOML, its strings quoted by
 `xmip-core-library-codec`: every control character is escaped, so any name,
