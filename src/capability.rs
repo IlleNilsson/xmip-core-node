@@ -132,14 +132,6 @@ impl Capability {
         &self.declared
     }
 
-    /// The node serving these stages: the role serving each, said as one
-    /// declaration — all three are executing.
-    #[must_use]
-    pub fn serving(stages: &[Stage]) -> Self {
-        let roles: Vec<NodeRole> = stages.iter().copied().map(NodeRole::serving).collect();
-        Self::of(&roles)
-    }
-
     /// The declaration a text names, read by [`NodeRole::declared`]: role
     /// words separated by commas or by `+`, lowercase exactly. Empty
     /// declares nothing.
@@ -372,11 +364,6 @@ mod tests {
         assert_eq!(whole.roles(), [NodeRole::Executing]);
         assert_eq!(whole.stages(), Stage::ALL);
         assert!(whole.executes());
-        assert_eq!(Capability::serving(&Stage::ALL), whole);
-        assert_eq!(
-            Capability::serving(&[Stage::Send, Stage::Receive]).words(),
-            "receiving,sending"
-        );
 
         let watching = Capability::parse("monitoring,operational").expect("two roles");
         assert_eq!(watching.words(), "operational,monitoring");
